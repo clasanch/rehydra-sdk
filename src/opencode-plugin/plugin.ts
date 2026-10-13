@@ -63,7 +63,7 @@ interface Hooks {
  * tool.execute.before hook uses the original args reference for execution —
  * replacing the object wholesale has no effect.
  */
-async function deepRehydrate(
+export async function deepRehydrate(
   value: unknown,
   session: AnonymizerSessionImpl,
   tagPrefix: string,
