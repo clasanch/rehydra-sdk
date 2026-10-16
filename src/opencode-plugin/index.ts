@@ -33,6 +33,7 @@ export default {
   setup: defaultV2Plugin.setup,
   async server(
     input?: Parameters<ReturnType<typeof createRehydraPlugin>>[0],
+    options?: Record<string, unknown>,
   ): Promise<Record<string, unknown>> {
     // Deprecated V1 entrypoint. Fall back to a no-op client and the current
     // working directory when the harness calls `server()` without input.
@@ -43,6 +44,6 @@ export default {
       directory: process.cwd(),
       worktree: process.cwd(),
     };
-    return await createRehydraPlugin()(resolved);
+    return await createRehydraPlugin()(resolved, options);
   },
 };
