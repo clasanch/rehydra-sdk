@@ -22,13 +22,13 @@ const v2 = createRehydraPluginV2();
 export default {
   id: v2.id,
   setup: v2.setup,
-  async server(input) {
+  async server(input, options) {
     const plugin = createRehydraPlugin();
     const resolved = input ?? {
       client: { app: { log: () => Promise.resolve(undefined) } },
       directory: process.cwd(),
       worktree: process.cwd(),
     };
-    return await plugin(resolved);
+    return await plugin(resolved, options);
   },
 };

@@ -62,6 +62,20 @@ OpenCode 2 passes options natively, with no local plugin file needed:
 
 Options in the config object map 1:1 to `RehydraPluginOptions`. When both config options and factory options are given, factory options win per key.
 
+### OpenCode 1 — plugin options
+
+OpenCode 1 takes options as the second element of a `[package, options]` entry:
+
+```json
+{
+  "plugin": [
+    ["@rehydra/opencode", { "disableTypes": ["URL", "IP_ADDRESS", "DATE"] }]
+  ]
+}
+```
+
+`disableTypes` replaces the default list, so keep `URL` and `IP_ADDRESS` in it if they should stay disabled.
+
 ### Local plugin file
 
 For custom settings via a local plugin file (`.opencode/plugins/rehydra.ts`), use the factory matching your OpenCode version:

@@ -11,6 +11,7 @@
 
 import { describe, it, expect, beforeAll } from "vitest";
 import { createRehydraPlugin } from "../../src/opencode-plugin/plugin.js";
+import dualPlugin from "../../src/opencode-plugin/index.js";
 
 // Helper: create a TextPart-like object
 function textPart(
@@ -654,5 +655,64 @@ describe("OpenCode Plugin", () => {
         ),
       ).rejects.toThrow(/No PII map found/);
     });
+  });
+});
+
+describe("disableTypes (issue #101)", () => {
+  const TEXT = "Mail test@example.com on 2024-03-15. BIC DEUTDEFF500, case CASE-2024";
+
+  async function scrub(
+    plugin: (
+      input: ReturnType<typeof mockCtx>,
+      options?: Record<string, unknown>,
+    ) => Promise<Record<string, unknown>>,
+    configOptions?: Record<string, unknown>,
+  ): Promise<string[]> {
+    const hooks = (await plugin(mockCtx(), configOptions)) as Record<
+      string,
+      (...args: any[]) => Promise<void>
+    >;
+    const output = { messages: [message("user", [textPart(TEXT), toolPart(TEXT)])] };
+    await hooks["experimental.chat.messages.transform"]!({}, output);
+    const [text, tool] = output.messages[0]!.parts as Array<{
+      text?: string;
+      state?: { output?: string };
+    }>;
+    return [text!.text!, tool!.state!.output!];
+  }
+
+  it("leaves disabled types in text and tool output", async () => {
+    const outputs = await scrub(
+      createRehydraPlugin({ disableTypes: ["DATE", "BIC_SWIFT", "CASE_ID"] }),
+    );
+
+    for (const output of outputs) {
+      expect(output).toBe(
+        'Mail <PII type="EMAIL" id="1"/> on 2024-03-15. BIC DEUTDEFF500, case CASE-2024',
+      );
+    }
+  });
+
+  it("applies options passed by OpenCode from opencode.json", async () => {
+    const [enabled] = await scrub(createRehydraPlugin());
+    const [disabled] = await scrub(createRehydraPlugin(), { disableTypes: ["DATE"] });
+
+    expect(enabled).toContain('type="DATE"');
+    expect(disabled).toContain("on 2024-03-15.");
+    expect(disabled).toContain('type="BIC_SWIFT"');
+  });
+
+  it("forwards opencode.json options through the default server() entrypoint", async () => {
+    const [output] = await scrub(dualPlugin.server, { disableTypes: ["DATE"] });
+
+    expect(output).toContain("on 2024-03-15.");
+  });
+
+  it("lets factory options override opencode.json options", async () => {
+    const [output] = await scrub(createRehydraPlugin({ disableTypes: [] }), {
+      disableTypes: ["DATE"],
+    });
+
+    expect(output).toContain('type="DATE"');
   });
 });
