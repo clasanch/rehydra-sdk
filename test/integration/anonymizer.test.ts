@@ -8,6 +8,7 @@ import {
   PIIType,
   ALL_PII_TYPES,
   createDefaultPolicy,
+  createDefaultRegistry,
   InMemoryKeyProvider,
   InMemoryPIIStorageProvider,
   decryptPIIMap,
@@ -797,5 +798,63 @@ describe('alphanumeric tag ids (issue #91)', () => {
     expect(rehydrate(result.anonymizedText, piiMap)).toBe('Reach alice@acme.com');
     // Case-mangled by a model: still resolves.
     expect(rehydrate('Reach <PII type="EMAIL" id="K9M2P7"/>', piiMap)).toBe('Reach alice@acme.com');
+  });
+});
+
+describe('disabled regex types (issue #101)', () => {
+  // Regression test for https://github.com/rehydra-ai/rehydra-sdk/issues/101
+  // Types removed from the policy or the registry must stay out of the text,
+  // and the stats must count exactly the tags that were written.
+  const text =
+    'Contact test@example.com on 2024-03-15. BIC DEUTDEFF500, case CASE-2024';
+  const disabled = [PIIType.DATE, PIIType.BIC_SWIFT, PIIType.CASE_ID];
+
+  function expectStatsMatchTags(result: {
+    anonymizedText: string;
+    stats: { totalEntities: number };
+  }): void {
+    const tags = result.anonymizedText.match(/<PII [^>]*\/>/g) ?? [];
+    expect(result.stats.totalEntities).toBe(tags.length);
+  }
+
+  it('leaves types out of regexEnabledTypes untouched', async () => {
+    const anon = createAnonymizer({ ner: { mode: 'disabled' } });
+    await anon.initialize();
+    const regexEnabledTypes = createDefaultPolicy().regexEnabledTypes;
+    for (const type of disabled) regexEnabledTypes.delete(type);
+
+    const result = await anon.anonymize(text, undefined, { regexEnabledTypes });
+
+    expect(result.anonymizedText).toBe(
+      'Contact <PII type="EMAIL" id="1"/> on 2024-03-15. BIC DEUTDEFF500, case CASE-2024'
+    );
+    expectStatsMatchTags(result);
+  });
+
+  it('stops detecting a type whose recognizer was unregistered', async () => {
+    const registry = createDefaultRegistry();
+    registry.unregister(PIIType.DATE);
+    const anon = createAnonymizer({ ner: { mode: 'disabled' }, registry });
+    await anon.initialize();
+
+    const result = await anon.anonymize(text);
+
+    expect(anon.getRegistry().hasRecognizer(PIIType.DATE)).toBe(false);
+    expect(result.anonymizedText).toContain('on 2024-03-15.');
+    expect(result.anonymizedText).not.toContain('type="DATE"');
+    expect(result.stats.countsByType[PIIType.DATE]).toBe(0);
+    expectStatsMatchTags(result);
+  });
+
+  it('detects the same types when they stay enabled', async () => {
+    const anon = createAnonymizer({ ner: { mode: 'disabled' } });
+    await anon.initialize();
+
+    const result = await anon.anonymize(text);
+
+    for (const type of disabled) {
+      expect(result.anonymizedText).toContain(`type="${type}"`);
+    }
+    expectStatsMatchTags(result);
   });
 });

@@ -50,7 +50,7 @@ interface OpencodeClient {
   [key: string]: unknown;
 }
 
-type Plugin = (input: PluginInput) => Promise<Hooks>;
+type Plugin = (input: PluginInput, options?: Record<string, unknown>) => Promise<Hooks>;
 
 interface Hooks {
   [key: string]: unknown;
@@ -105,12 +105,18 @@ export async function deepRehydrate(
  * @example
  * ```json
  * // opencode.json — when published as npm package
- * { "plugin": ["@rehydra/opencode-plugin"] }
+ * { "plugin": [["@rehydra/opencode", { "disableTypes": ["DATE"] }]] }
  * ```
  */
-export function createRehydraPlugin(options?: RehydraPluginOptions): Plugin {
-  return async (ctx) => {
+export function createRehydraPlugin(factoryOptions?: RehydraPluginOptions): Plugin {
+  return async (ctx, configOptions) => {
     const { client } = ctx;
+    // OpenCode passes options from opencode.json as the second argument.
+    // Factory options take precedence per key.
+    const options: RehydraPluginOptions = {
+      ...(configOptions as RehydraPluginOptions | undefined),
+      ...factoryOptions,
+    };
     const SERVICE = "rehydra";
 
     function log(
