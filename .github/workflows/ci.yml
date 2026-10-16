@@ -63,6 +63,11 @@ jobs:
       - name: Build package
         run: npm run build
 
+      # npm 10 crashes resolving the current Vite 8 dependency graph
+      # ("Cannot read properties of null (reading 'edgesOut')"); npm 11 does not.
+      - name: Update npm
+        run: npm install -g npm@11
+
       - name: Create test project
         run: |
           mkdir -p test-browser-build
