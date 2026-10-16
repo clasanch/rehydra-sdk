@@ -17,6 +17,14 @@ export interface RehydraPluginOptions {
    * Skips node_modules, .git, and symlinks. Pass [] to disable file loading. */
   envFiles?: string[];
 
+  /** Minimum milliseconds between checks of envFiles for new or changed secrets (default: 2000).
+   * Pass false to load them only when the plugin starts. */
+  envRefreshInterval?: number | false;
+
+  /** Tools whose arguments keep their placeholders: real values are not restored before they run,
+   * and detected values are redacted. `*` matches any characters, e.g. ["webfetch", "exa_*"]. */
+  redactTools?: string[];
+
   /** Explicit values to always redact */
   redactValues?: string[];
 
