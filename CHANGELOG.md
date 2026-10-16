@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.16.0](https://github.com/rehydra-ai/rehydra-sdk/compare/v0.15.0...v0.16.0) (2026-10-16)
+
+
+### Features
+
+* **opencode:** keep webfetch and websearch args redacted by default ([2fd41b0](https://github.com/rehydra-ai/rehydra-sdk/commit/2fd41b038840981c9bdd754ba88c5c2d6dc921c4))
+* **opencode:** reload env files and keep tool args redacted ([5bbfcb4](https://github.com/rehydra-ai/rehydra-sdk/commit/5bbfcb45ff55e382a75b0d67dd702db8de4c6d06))
+* **opencode:** reload env files and keep tool args redacted ([d1a6b13](https://github.com/rehydra-ai/rehydra-sdk/commit/d1a6b13649d25fc0c886aaf0b73fb32df1667b40)), closes [#107](https://github.com/rehydra-ai/rehydra-sdk/issues/107) [#108](https://github.com/rehydra-ai/rehydra-sdk/issues/108)
+
 ## [0.15.0](https://github.com/rehydra-ai/rehydra-sdk/compare/v0.14.0...v0.15.0) (2026-10-16)
 
 
