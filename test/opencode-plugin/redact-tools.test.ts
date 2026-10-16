@@ -59,8 +59,16 @@ describe("redactTools", () => {
     expect(await runTool(hooks, "my_exa_search", tag)).toBe(SECRET);
   });
 
-  it("restores every tool's arguments by default", async () => {
+  it("keeps webfetch and websearch arguments redacted by default", async () => {
     const { hooks, tag } = await v1({});
+
+    expect(await runTool(hooks, "webfetch", tag)).toBe(tag);
+    expect(await runTool(hooks, "websearch", tag)).toBe(tag);
+    expect(await runTool(hooks, "bash", tag)).toBe(SECRET);
+  });
+
+  it("restores every tool's arguments with an empty list", async () => {
+    const { hooks, tag } = await v1({ redactTools: [] });
     expect(await runTool(hooks, "webfetch", tag)).toBe(SECRET);
   });
 

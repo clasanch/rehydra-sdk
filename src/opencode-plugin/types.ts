@@ -22,7 +22,8 @@ export interface RehydraPluginOptions {
   envRefreshInterval?: number | false;
 
   /** Tools whose arguments keep their placeholders: real values are not restored before they run,
-   * and detected values are redacted. `*` matches any characters, e.g. ["webfetch", "exa_*"]. */
+   * and detected values are redacted. `*` matches any characters, e.g. "exa_*".
+   * Default: ["webfetch", "websearch"]. Pass [] to restore real values for every tool. */
   redactTools?: string[];
 
   /** Explicit values to always redact */

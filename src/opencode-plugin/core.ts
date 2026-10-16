@@ -22,6 +22,7 @@ export type LogLevel = "debug" | "info" | "warn" | "error";
 export type Log = (level: LogLevel, message: string, extra?: Record<string, unknown>) => void;
 
 const DEFAULT_ENV_REFRESH_INTERVAL = 2000;
+const DEFAULT_REDACT_TOOLS = ["webfetch", "websearch"];
 
 /**
  * Merges options passed by OpenCode (opencode.json) with factory options.
@@ -176,14 +177,15 @@ export async function createRehydraCore(
     };
   }
 
-  const redactTools = (options.redactTools ?? []).map(toolPattern);
+  const redactToolNames = options.redactTools ?? DEFAULT_REDACT_TOOLS;
+  const redactTools = redactToolNames.map(toolPattern);
   const envRefreshInterval = options.envRefreshInterval ?? DEFAULT_ENV_REFRESH_INTERVAL;
 
   log("info", "plugin initialized", {
     envFiles: anonymizerConfig.secrets?.envFiles,
     redactValueCount: options.redactValues?.length ?? 0,
     disableTypes,
-    redactTools: options.redactTools ?? [],
+    redactTools: redactToolNames,
     ...context.info,
   });
 
