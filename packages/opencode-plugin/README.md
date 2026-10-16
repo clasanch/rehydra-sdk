@@ -35,7 +35,7 @@ Add to `opencode.json` — **OpenCode 2** uses the plural `plugins` key:
 
 By default, the plugin discovers `**/.env*` under the OpenCode project directory, including files such as `packages/api/.env` and `apps/web/.env.local`. It skips `node_modules`, `.git`, and symbolic links. Secrets with values of 4+ characters are detected and scrubbed.
 
-`envFiles` accepts exact paths and glob patterns, resolved against the project directory even when OpenCode starts elsewhere. Use `envFiles: [".env"]` for root-only loading, or `envFiles: []` to disable file loading. Files are loaded once when the plugin initializes; restart OpenCode after changing them. Missing files are ignored. An advanced `anonymizer` configuration keeps control of its own `secrets` settings, with relative paths still rooted at the project directory unless `secrets.envBaseDirectory` is set.
+`envFiles` accepts exact paths and glob patterns, resolved against the project directory even when OpenCode starts elsewhere. Use `envFiles: [".env"]` for root-only loading, or `envFiles: []` to disable file loading. Before a model request, the plugin checks the files again if at least `envRefreshInterval` milliseconds (default 2000) have passed since the last check, so new or changed secrets are picked up without restarting OpenCode. Set `envRefreshInterval: false` to load them only at startup. Missing files are ignored. An advanced `anonymizer` configuration keeps control of its own `secrets` settings, with relative paths still rooted at the project directory unless `secrets.envBaseDirectory` is set.
 
 ## Configuration
 
@@ -53,6 +53,7 @@ OpenCode 2 passes options natively, with no local plugin file needed:
         "redactValues": ["sk-live-abc123..."],
         "minValueLength": 6,
         "disableTypes": ["URL", "IP_ADDRESS"],
+        "redactTools": ["webfetch", "websearch", "exa_*"],
         "vcsIdentities": true
       }
     }
@@ -96,6 +97,9 @@ export default createRehydraPluginV2({
   // Disable detection of specific PII types
   disableTypes: ["URL", "IP_ADDRESS"],
 
+  // Keep placeholders in the arguments of tools that call external services
+  redactTools: ["webfetch", "websearch", "exa_*"],
+
   // Redact identities in Git and GitHub CLI output
   vcsIdentities: true,
 });
@@ -104,6 +108,8 @@ export default createRehydraPluginV2({
 On OpenCode 1, import `createRehydraPlugin` instead (it returns the callable V1 plugin).
 
 `vcsIdentities` detects logins in `gh pr` and `gh api` output, plus author and committer names in `git log`, `git show`, and `git blame` output. It redacts every occurrence of those identities in the same tool output without touching npm scopes or other `@` identifiers in unrelated commands. GitHub display names outside these structured fields still require the optional local NER model.
+
+`redactTools` lists tools whose arguments keep their placeholders. The plugin normally restores real values before a tool runs. For these tools it leaves the placeholders in place and redacts any other detected values in the arguments, so secrets and PII don't reach external services through tools such as `webfetch` or `websearch`. `*` matches any characters, which helps with MCP tools: `"exa_*"`. The default is `["webfetch", "websearch"]`. Setting `redactTools` replaces it, so keep those two in your list, or pass `[]` to restore real values for every tool.
 
 ## What gets detected
 
@@ -121,7 +127,7 @@ On OpenCode 1, import `createRehydraPlugin` instead (it returns the callable V1 
 | --------------------------------------------------------------- | -------------------------------------------------------------- |
 | `session.hook("context" / "compaction" / "generate" / "title")` | Scrubs secrets from all message text before each model request |
 | `event.system.push(...)`                                        | Tells the LLM to treat placeholders as real values             |
-| `tool.hook("execute.before")`                                   | Restores real values in tool arguments before local execution  |
+| `tool.hook("execute.before")`                                   | Restores real values in tool arguments before local execution, except for `redactTools` |
 | `tool.hook("execute.after")`                                    | Restores real values in displayed tool output                  |
 
 The scrubber is registered on all four session-request kinds, so title generation, checkpoint compaction, and transient generates are protected too.
@@ -132,7 +138,7 @@ The scrubber is registered on all four session-request kinds, so title generatio
 | -------------------------------------- | -------------------------------------------------------------- |
 | `experimental.chat.messages.transform` | Scrubs secrets from all message text before it reaches the LLM |
 | `experimental.chat.system.transform`   | Tells the LLM to treat placeholders as real values             |
-| `tool.execute.before`                  | Restores real values in tool arguments before local execution  |
+| `tool.execute.before`                  | Restores real values in tool arguments before local execution, except for `redactTools` |
 | `tool.execute.after`                   | Restores real values in displayed tool output                  |
 | `experimental.text.complete`           | Restores real values in LLM response text shown to you         |
 

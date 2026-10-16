@@ -71,6 +71,20 @@ export class RecognizerRegistry {
   }
 
   /**
+   * Removes one recognizer, keeping the others registered for its type
+   */
+  remove(recognizer: Recognizer): void {
+    const remaining = (this.recognizers.get(recognizer.type) ?? []).filter(
+      (item) => item !== recognizer
+    );
+    if (remaining.length > 0) {
+      this.recognizers.set(recognizer.type, remaining);
+    } else {
+      this.recognizers.delete(recognizer.type);
+    }
+  }
+
+  /**
    * Clears all recognizers
    */
   clear(): void {

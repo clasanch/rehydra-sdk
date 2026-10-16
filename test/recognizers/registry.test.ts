@@ -185,6 +185,31 @@ describe('RecognizerRegistry', () => {
     });
   });
 
+  describe('remove', () => {
+    it('should remove one recognizer and keep the others of its type', () => {
+      const custom = createRegexRecognizer({
+        type: PIIType.EMAIL,
+        name: 'Custom',
+        patterns: [/test/gi],
+      });
+      registry.register(emailRecognizer);
+      registry.register(custom);
+
+      registry.remove(custom);
+
+      expect(registry.getRecognizers(PIIType.EMAIL)).toEqual([emailRecognizer]);
+    });
+
+    it('should drop the type once its last recognizer is removed', () => {
+      registry.register(emailRecognizer);
+
+      registry.remove(emailRecognizer);
+
+      expect(registry.hasRecognizer(PIIType.EMAIL)).toBe(false);
+      expect(registry.getRegisteredTypes()).not.toContain(PIIType.EMAIL);
+    });
+  });
+
   describe('unregister', () => {
     it('should remove all recognizers for type', () => {
       registry.register(emailRecognizer);

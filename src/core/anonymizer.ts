@@ -25,6 +25,7 @@ import {
   createSecretRecognizers,
 } from "../recognizers/index.js";
 import { createLiteralValueRecognizer } from "../recognizers/secrets/literal-value.js";
+import type { Recognizer } from "../recognizers/base.js";
 
 import {
   type INERModel,
@@ -331,6 +332,8 @@ export class Anonymizer {
   private sessionFactory: SessionFactory | null;
   private onValidationWarning: ((warnings: Array<{ code: string; message: string }>) => void) | null;
   private tagFormat: TagFormat;
+  private literalRecognizer: Recognizer | null = null;
+  private secretValuesKey: string | null = null;
 
   constructor(config: AnonymizerConfig = {}, sessionFactory?: SessionFactory) {
     this.registry = config.registry ?? createDefaultRegistry();
@@ -542,34 +545,7 @@ export class Anonymizer {
 
     // Handle secrets .env file loading and literal value matching
     if (this.secretsConfig.enabled) {
-      const literalValues: string[] = [
-        ...(this.secretsConfig.redactValues ?? []),
-      ];
-      const minLength = this.secretsConfig.minValueLength ?? 4;
-
-      // Parse .env files if provided
-      if (this.secretsConfig.envFiles !== undefined && this.secretsConfig.envFiles.length > 0) {
-        const storage = await getStorageProvider();
-        const envFiles = storage.resolveFiles !== undefined
-          ? await storage.resolveFiles(this.secretsConfig.envFiles, this.secretsConfig.envBaseDirectory)
-          : this.secretsConfig.envFiles;
-        for (const envFile of envFiles) {
-          try {
-            const content = await storage.readTextFile(envFile);
-            const parsed = parseEnvFile(content);
-            literalValues.push(...parsed);
-          } catch {
-            // Skip files that can't be read
-          }
-        }
-      }
-
-      // Register literal value recognizer if we have values
-      if (literalValues.length > 0) {
-        this.registry.register(
-          createLiteralValueRecognizer(literalValues, minLength),
-        );
-      }
+      this.applySecretValues(await this.readSecretValues());
     }
 
     this.modelVersion = this.nerModel.version;
@@ -727,6 +703,58 @@ export class Anonymizer {
       piiMap: encryptedPiiMap,
       stats,
     };
+  }
+
+  /**
+   * Re-reads `secrets.envFiles`, resolving globs again, and updates the
+   * values matched as ENV_VAR_SECRET.
+   * @returns Whether the set of secret values changed
+   */
+  async reloadSecrets(): Promise<boolean> {
+    if (!this.secretsConfig.enabled) return false;
+    if (!this.initialized) {
+      await this.initialize();
+      return false;
+    }
+    return this.applySecretValues(await this.readSecretValues());
+  }
+
+  private async readSecretValues(): Promise<string[]> {
+    const values = [...(this.secretsConfig.redactValues ?? [])];
+    const patterns = this.secretsConfig.envFiles;
+    if (patterns === undefined || patterns.length === 0) return values;
+
+    const storage = await getStorageProvider();
+    const envFiles = storage.resolveFiles !== undefined
+      ? await storage.resolveFiles(patterns, this.secretsConfig.envBaseDirectory)
+      : patterns;
+    for (const envFile of envFiles) {
+      try {
+        values.push(...parseEnvFile(await storage.readTextFile(envFile)));
+      } catch {
+        // Skip files that can't be read
+      }
+    }
+    return values;
+  }
+
+  private applySecretValues(values: string[]): boolean {
+    const key = JSON.stringify(values);
+    if (key === this.secretValuesKey) return false;
+    this.secretValuesKey = key;
+
+    if (this.literalRecognizer !== null) {
+      this.registry.remove(this.literalRecognizer);
+      this.literalRecognizer = null;
+    }
+    if (values.length > 0) {
+      this.literalRecognizer = createLiteralValueRecognizer(
+        values,
+        this.secretsConfig.minValueLength ?? 4,
+      );
+      this.registry.register(this.literalRecognizer);
+    }
+    return true;
   }
 
   /**
