@@ -2,9 +2,14 @@
 
 Scrub detected secrets from OpenCode messages before the main LLM request.
 
-This plugin intercepts the conversation between [OpenCode](https://github.com/sst/opencode) and the LLM. Secrets from your `.env` files are replaced with placeholders before they leave your machine, and transparently restored before any tool (shell commands, file writes, etc.) executes locally.
+This plugin intercepts the conversation between [OpenCode](https://github.com/anomalyco/opencode) and the LLM. Secrets from your `.env` files are replaced with placeholders before they leave your machine, and transparently restored before any tool (shell commands, file writes, etc.) executes locally.
 
-Detected values are masked in requests that pass through the plugin hooks. Local tools receive the restored values. See the title-generation limitation below.
+Detected values are masked in requests that pass through the plugin hooks. Local tools receive the restored values.
+
+**OpenCode compatibility:** the default entrypoint supports both OpenCode 2 (V2 plugin API) and OpenCode 1 (V2 converts the old `plugin` config key and calls `server()` for object entrypoints; OpenCode 1 releases older than 1.18.29 should import the `rehydra` function export or pin `@rehydra/opencode@0.14`). The same package ships both implementations:
+
+- OpenCode 2 — `Plugin.define({ id: "rehydra", setup(ctx) })` via `createRehydraPluginV2()`
+- OpenCode 1 — classic hooks object via `createRehydraPlugin()`
 
 ## Install
 
@@ -12,7 +17,15 @@ Detected values are masked in requests that pass through the plugin hooks. Local
 npm install @rehydra/opencode
 ```
 
-Add to `opencode.json`:
+Add to `opencode.json` — **OpenCode 2** uses the plural `plugins` key:
+
+```json
+{
+  "plugins": ["@rehydra/opencode"]
+}
+```
+
+**OpenCode 1** uses the singular `plugin` key:
 
 ```json
 {
@@ -24,31 +37,39 @@ By default, the plugin discovers `**/.env*` under the OpenCode project directory
 
 `envFiles` accepts exact paths and glob patterns, resolved against the project directory even when OpenCode starts elsewhere. Use `envFiles: [".env"]` for root-only loading, or `envFiles: []` to disable file loading. Files are loaded once when the plugin initializes; restart OpenCode after changing them. Missing files are ignored. An advanced `anonymizer` configuration keeps control of its own `secrets` settings, with relative paths still rooted at the project directory unless `secrets.envBaseDirectory` is set.
 
-## Session title limitation
+## Configuration
 
-OpenCode also sends the first user message to a separate LLM call to generate a session title. That call bypasses `experimental.chat.messages.transform`, so the plugin cannot scrub it. The first message can reach the title model with secrets intact even when the main conversation is anonymized. This limitation is tracked in [OpenCode issue #46115](https://github.com/anomalyco/opencode/issues/46115).
+### OpenCode 2 — plugin options
 
-To prevent that request, disable OpenCode's title agent in `opencode.json`:
+OpenCode 2 passes options natively, with no local plugin file needed:
 
 ```json
 {
-  "plugin": ["@rehydra/opencode"],
-  "agent": {
-    "title": { "disable": true }
-  }
+  "plugins": [
+    {
+      "package": "@rehydra/opencode",
+      "options": {
+        "envFiles": [".env", ".env.local", ".env.production"],
+        "redactValues": ["sk-live-abc123..."],
+        "minValueLength": 6,
+        "disableTypes": ["URL", "IP_ADDRESS"],
+        "vcsIdentities": true
+      }
+    }
+  ]
 }
 ```
 
-This turns off automatic session titles. Restart OpenCode after changing the configuration. The plugin protects requests that invoke its hooks; it cannot intercept other model calls made outside those hooks.
+Options in the config object map 1:1 to `RehydraPluginOptions`. When both config options and factory options are given, factory options win per key.
 
-## Configuration
+### Local plugin file
 
-For custom settings, create `.opencode/plugins/rehydra.ts`:
+For custom settings via a local plugin file (`.opencode/plugins/rehydra.ts`), use the factory matching your OpenCode version:
 
 ```typescript
-import { createRehydraPlugin } from "@rehydra/opencode";
+import { createRehydraPluginV2 } from "@rehydra/opencode";
 
-export default createRehydraPlugin({
+export default createRehydraPluginV2({
   // Scan multiple env files
   envFiles: [".env", ".env.local", ".env.production"],
 
@@ -66,11 +87,9 @@ export default createRehydraPlugin({
 });
 ```
 
-`vcsIdentities` detects logins in `gh pr` and `gh api` output, plus author and
-committer names in `git log`, `git show`, and `git blame` output. It redacts
-every occurrence of those identities in the same tool output without touching
-npm scopes or other `@` identifiers in unrelated commands. GitHub display names
-outside these structured fields still require the optional local NER model.
+On OpenCode 1, import `createRehydraPlugin` instead (it returns the callable V1 plugin).
+
+`vcsIdentities` detects logins in `gh pr` and `gh api` output, plus author and committer names in `git log`, `git show`, and `git blame` output. It redacts every occurrence of those identities in the same tool output without touching npm scopes or other `@` identifiers in unrelated commands. GitHub display names outside these structured fields still require the optional local NER model.
 
 ## What gets detected
 
@@ -82,21 +101,53 @@ outside these structured fields still require the optional local NER model.
 
 ## How it works
 
-The plugin uses five OpenCode hooks:
+### OpenCode 2 hooks
 
-| Hook | What it does |
-|---|---|
-| `messages.transform` | Scrubs secrets from all message text before it reaches the LLM |
-| `system.transform` | Tells the LLM to treat placeholders as real values |
-| `tool.execute.before` | Restores real values in tool arguments before local execution |
-| `tool.execute.after` | Restores real values in displayed tool output |
-| `text.complete` | Restores real values in LLM response text shown to you |
+| Hook                                                            | What it does                                                   |
+| --------------------------------------------------------------- | -------------------------------------------------------------- |
+| `session.hook("context" / "compaction" / "generate" / "title")` | Scrubs secrets from all message text before each model request |
+| `event.system.push(...)`                                        | Tells the LLM to treat placeholders as real values             |
+| `tool.hook("execute.before")`                                   | Restores real values in tool arguments before local execution  |
+| `tool.hook("execute.after")`                                    | Restores real values in displayed tool output                  |
 
-Detection and rehydration run locally. The main conversation is scrubbed through the message hook before forwarding to the LLM provider. The separate title request described above needs its own opt-out.
+The scrubber is registered on all four session-request kinds, so title generation, checkpoint compaction, and transient generates are protected too.
+
+### OpenCode 1 hooks
+
+| Hook                                   | What it does                                                   |
+| -------------------------------------- | -------------------------------------------------------------- |
+| `experimental.chat.messages.transform` | Scrubs secrets from all message text before it reaches the LLM |
+| `experimental.chat.system.transform`   | Tells the LLM to treat placeholders as real values             |
+| `tool.execute.before`                  | Restores real values in tool arguments before local execution  |
+| `tool.execute.after`                   | Restores real values in displayed tool output                  |
+| `experimental.text.complete`           | Restores real values in LLM response text shown to you         |
+
+Detection and rehydration run locally. No data leaves your machine except the scrubbed conversation sent to the LLM provider.
+
+## Known limitations
+
+### Session titles — fixed on OpenCode 2
+
+OpenCode 1 sends the first user message to a separate LLM call to generate a session title. That call bypasses `experimental.chat.messages.transform`, so the V1 plugin cannot scrub it ([OpenCode issue #46115](https://github.com/anomalyco/opencode/issues/46115)). On OpenCode 1, disable the title agent:
+
+```json
+{
+  "plugin": ["@rehydra/opencode"],
+  "agent": {
+    "title": { "disable": true }
+  }
+}
+```
+
+On OpenCode 2 this workaround is unnecessary — the plugin registers a `title` session hook and scrubs the request.
+
+### Final response text on OpenCode 2
+
+OpenCode 2 removed the `experimental.text.complete` hook with no replacement. Tool execution and outgoing conversation history stay protected; assistant responses that echo a PII placeholder into chat text will display the placeholder (`<PII type="…" id="…"/>`) instead of the real value. Tool arguments referencing the placeholder still receive real values before local execution.
 
 ## Logging
 
-Plugin activity is logged to OpenCode's log directory (`~/.local/share/opencode/log/`). Run with `--log-level DEBUG` for detailed output.
+Plugin activity is logged to OpenCode's log directory (`~/.local/share/opencode/log/`). OpenCode 2 plugins log through the console (captured by OpenCode's log service); OpenCode 1 plugins log through the internal log API. Run with `--log-level DEBUG` for detailed output.
 
 ```
 INFO service=rehydra scrubbed={"ENV_VAR_SECRET":2} messageCount=3 scrubbed 2 secret(s) from messages

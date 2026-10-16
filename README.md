@@ -72,12 +72,14 @@ npm install @rehydra/opencode
 ```
 
 ```json
-{ "plugin": ["@rehydra/opencode"] }
+{ "plugins": ["@rehydra/opencode"] }
 ```
 
-Intercepts the conversation between [OpenCode](https://github.com/sst/opencode) and the LLM. Secrets from `.env` files are replaced with placeholders before they leave your machine and restored before tools execute.
+On OpenCode 1 use the singular `"plugin"` key instead. The same package ships the V2 (OpenCode 2) and V1 (OpenCode 1) plugin implementations.
 
-OpenCode's separate session-title request bypasses the plugin hooks and can send the first message without scrubbing. Disable the title agent to prevent that call; see [the limitation and configuration](packages/opencode-plugin/README.md#session-title-limitation).
+Intercepts the conversation between [OpenCode](https://github.com/anomalyco/opencode) and the LLM. Secrets from `.env` files are replaced with placeholders before they leave your machine and restored before tools execute.
+
+OpenCode 1's separate session-title request bypasses the plugin hooks and can send the first message without scrubbing; disable the title agent to prevent that call. On OpenCode 2 the plugin scrubs title requests through its own session hook.
 
 ### CLI
 
