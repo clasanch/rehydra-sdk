@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.15.0](https://github.com/rehydra-ai/rehydra-sdk/compare/v0.14.0...v0.15.0) (2026-10-16)
+
+
+### Features
+
+* **opencode:** support OpenCode 2 V2 plugin API via dual V1/V2 entrypoint ([04a5c2f](https://github.com/rehydra-ai/rehydra-sdk/commit/04a5c2f69ca3677e18c4c59f52a7a6acda1b9a8f))
+* **opencode:** support OpenCode 2 V2 plugin API via dual V1/V2 entrypoint ([47a8154](https://github.com/rehydra-ai/rehydra-sdk/commit/47a81541c5f0c30500a9ccc80dfb334fb53f0730))
+* **plugin:** dual V1/V2 entrypoint — add OpenCode 2 (V2 Plugin API) support ([38c4a94](https://github.com/rehydra-ai/rehydra-sdk/commit/38c4a946602cd13942a06589bde2aeb4790ecc90))
+
+
+### Bug Fixes
+
+* **opencode:** apply plugin options from opencode.json ([adc572f](https://github.com/rehydra-ai/rehydra-sdk/commit/adc572fc3766104ac00cae9a0ce0ec7a44664b60))
+* **opencode:** apply plugin options from opencode.json ([7e7dd50](https://github.com/rehydra-ai/rehydra-sdk/commit/7e7dd506b4211a267983cab8981e68c0bcb794c0))
+* **recognizers:** match full multi-segment case IDs ([b7f6f65](https://github.com/rehydra-ai/rehydra-sdk/commit/b7f6f6520f6f579aa8ddea655a13dca3cf6c7731))
+* **recognizers:** match full multi-segment case IDs ([d3c1b50](https://github.com/rehydra-ai/rehydra-sdk/commit/d3c1b50b793933e4afb23a3b09e14e92617d47de))
+
 ## [0.14.0](https://github.com/rehydra-ai/rehydra-sdk/compare/v0.13.0...v0.14.0) (2026-09-06)
 
 
