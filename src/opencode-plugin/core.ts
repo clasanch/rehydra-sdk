@@ -85,17 +85,20 @@ function toolPattern(pattern: string): RegExp {
  * "api_error: Non-base64 digit found"). A 5-digit span matching POSTAL_CODE
  * by chance inside a 57 KB PNG screenshot is enough to trigger it.
  *
- * `data:` URIs are unambiguous. Raw base64 blobs are recognised by length plus
- * the base64 alphabet; the threshold keeps ordinary prose — and secrets with
+ * `data:` URIs are recognised by their header and a payload that is base64
+ * throughout, so text before or after one in the same string is still
+ * scrubbed. Raw base64 blobs are recognised by length plus the base64
+ * alphabet; the threshold keeps ordinary prose — and secrets with
  * recognisable prefixes such as `sk-…`, JWTs, or PEM headers, which contain
  * characters outside the alphabet — on the scrubbing path.
  */
-const DATA_URI_PREFIX = /^data:[^,]*;base64,/i;
+const DATA_URI_HEADER = /^data:(?:[\w.+-]+\/[\w.+-]+)?(?:;[\w.+-]+=[^;,\s]*)*;base64,/i;
 const BASE64_ALPHABET_ONLY = /^[A-Za-z0-9+/=\r\n]+$/;
 const MIN_RAW_BASE64_LENGTH = 512;
 
 function isBinaryPayload(value: string): boolean {
-  if (DATA_URI_PREFIX.test(value)) return true;
+  const header = DATA_URI_HEADER.exec(value);
+  if (header !== null) return BASE64_ALPHABET_ONLY.test(value.slice(header[0].length));
   return value.length >= MIN_RAW_BASE64_LENGTH && BASE64_ALPHABET_ONLY.test(value);
 }
 

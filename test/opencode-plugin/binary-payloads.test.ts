@@ -153,4 +153,39 @@ describe("binary payloads in tool results", () => {
 
     expect(toolResultUri(event)).toBe(shortUri);
   });
+
+  it("should keep a data URI with parameters and no media type", async () => {
+    const context = await setup();
+    const named = `data:image/png;name=shot.png;base64,${RAW_BASE64}`;
+    const bare = `data:;base64,${RAW_BASE64}`;
+
+    const namedEvent = imageRequest(named, "no secrets here");
+    const bareEvent = imageRequest(bare, "no secrets here");
+    await context(namedEvent);
+    await context(bareEvent);
+
+    expect(toolResultUri(namedEvent)).toBe(named);
+    expect(toolResultUri(bareEvent)).toBe(bare);
+  });
+
+  it("should still scrub text that follows a data URI in the same string", async () => {
+    const context = await setup();
+    const mixed = `data:image/gif;base64,R0lGODlhAQABAAAAACw=\n\ntoken ${SECRET_IN_BASE64}`;
+
+    const event = imageRequest(mixed, "no secrets here");
+    await context(event);
+
+    expect(toolResultUri(event)).not.toContain(SECRET_IN_BASE64);
+    expect(toolResultUri(event)).toContain("<PII");
+  });
+
+  it("should still scrub a string that only resembles a data URI header", async () => {
+    const context = await setup();
+    const fake = `data: sent by ${SECRET_IN_BASE64};base64,R0lGODlhAQABAAAAACw=`;
+
+    const event = imageRequest(fake, "no secrets here");
+    await context(event);
+
+    expect(toolResultUri(event)).not.toContain(SECRET_IN_BASE64);
+  });
 });
